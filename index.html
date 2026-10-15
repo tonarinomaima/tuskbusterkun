@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeTracker - Note Style</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts (Inter & Noto Sans JP) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            note: {
+              green: '#2cb696',
+              'green-hover': '#24987d',
+              'green-light': '#eaf8f5',
+              bg: '#f7f9f9',
+              card: '#ffffff',
+              text: '#222222',
+              subtext: '#666666',
+              border: '#e6e6e6'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #f7f9f9;
+      color: #222222;
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+    /* カスタムスクロールバー */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #ddd;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #ccc;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-note-border sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-full bg-note-green flex items-center justify-center text-white font-bold text-lg">
+          <i data-lucide="timer" class="w-5 h-5"></i>
+        </div>
+        <span class="font-bold text-lg tracking-tight text-note-text">FocusLog</span>
+      </div>
+      <div class="flex items-center space-x-3 text-sm text-note-subtext">
+        <span id="current-date-display" class="font-medium hidden sm:inline"></span>
+        <button id="reset-day-btn" class="flex items-center space-x-1 text-xs px-3 py-1.5 rounded-full border border-note-border hover:bg-gray-100 transition-colors text-gray-600">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>日を改める</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-4xl mx-auto w-full px-4 py-8 flex-grow grid grid-cols-1 md:grid-cols-12 gap-8">
+    
+    <!-- 左側：タスク入力＆一覧 (7カラム) -->
+    <section class="md:col-span-7 space-y-6">
+      
+      <!-- タスク追加カード -->
+      <div class="bg-white rounded-2xl p-5 border border-note-border shadow-sm">
+        <h2 class="text-xs font-bold text-note-subtext tracking-wider uppercase mb-3 flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-note-green"></i>
+          新しいタスクを追加
+        </h2>
+        <form id="add-task-form" class="flex gap-2">
+          <input 
+            type="text" 
+            id="task-input" 
+            placeholder="例: ブログ記事の下書き作成、デザイン調整..." 
+            class="flex-1 px-4 py-2.5 rounded-xl border border-note-border focus:outline-none focus:border-note-green focus:ring-2 focus:ring-note-green/20 text-sm transition-all placeholder:text-gray-400"
+            required
+          >
+          <button 
+            type="submit" 
+            class="bg-note-green hover:bg-note-green-hover text-white font-medium px-5 py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center shadow-sm shrink-0"
+          >
+            追加
+          </button>
+        </form>
+      </div>
+
+      <!-- 今日の総計測時間表示 -->
+      <div class="bg-gradient-to-r from-note-green-light to-white rounded-2xl p-5 border border-note-green/20 flex justify-between items-center">
+        <div>
+          <span class="text-xs font-semibold text-note-subtext block">本日の合計作業時間</span>
+          <span id="total-time-display" class="text-2xl font-bold text-note-text tracking-tight">00:00:00</span>
+        </div>
+        <div class="text-right">
+          <span class="text-xs font-semibold text-note-subtext block">完了タスク</span>
+          <span id="completed-count-display" class="text-xl font-bold text-note-green">0 / 0</span>
+        </div>
+      </div>
+
+      <!-- タスクリスト -->
+      <div class="space-y-3">
+        <div class="flex justify-between items-center px-1">
+          <h3 class="text-sm font-bold text-note-text flex items-center gap-2">
+            タスク一覧
+          </h3>
+          <span id="task-count-label" class="text-xs text-note-subtext">0件</span>
+        </div>
+
+        <div id="task-list" class="space-y-3">
+          <!-- JSで動的に追加されます -->
+        </div>
+
+        <!-- 空の状態 -->
+        <div id="empty-state" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-note-border">
+          <i data-lucide="sparkles" class="w-10 h-10 text-gray-300 mx-auto mb-2"></i>
+          <p class="text-sm text-note-subtext font-medium">今日のタスクを追加して計測をはじめましょう！</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 右側：日報テキスト出力 & コピー (5カラム) -->
+    <section class="md:col-span-5 space-y-6">
+      <div class="bg-white rounded-2xl p-5 border border-note-border shadow-sm sticky top-24">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xs font-bold text-note-subtext tracking-wider uppercase flex items-center gap-1.5">
+            <i data-lucide="file-text" class="w-4 h-4 text-note-green"></i>
+            日報・SNS用テキスト
+          </h2>
+          <span class="text-[10px] bg-note-green-light text-note-green px-2 py-0.5 rounded-full font-semibold">自動生成</span>
+        </div>
+
+        <!-- 日報プレビュー枠 -->
+        <div class="relative">
+          <textarea 
+            id="report-textarea" 
+            rows="11" 
+            class="w-full p-3.5 rounded-xl border border-note-border bg-gray-50 text-xs leading-relaxed font-mono text-note-text focus:outline-none focus:border-note-green focus:bg-white transition-all resize-none"
+            placeholder="タスクを記録すると自動でテキストが生成されます..."
+          ></textarea>
+        </div>
+
+        <!-- アクションボタン群 -->
+        <div class="mt-4 space-y-2">
+          <button 
+            id="copy-report-btn" 
+            class="w-full bg-note-green hover:bg-note-green-hover text-white font-medium py-2.5 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
+          >
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span>テキストをコピー</span>
+          </button>
+          
+          <p class="text-[11px] text-center text-note-subtext pt-1">
+            NoteやX(Twitter)への投稿、日報連絡にそのまま貼り付けられます。
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- フッター -->
+  <footer class="bg-white border-t border-note-border py-4 text-center text-xs text-note-subtext">
+    <p>FocusLog — Note Style Task Timer & Daily Report</p>
+  </footer>
+
+  <!-- コピートースト通知 -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-note-text text-white px-4 py-3 rounded-xl shadow-lg text-sm flex items-center space-x-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <i data-lucide="check-circle-2" class="w-4 h-4 text-note-green"></i>
+    <span id="toast-message">クリップボードにコピーしました！</span>
+  </div>
+
+  <!-- JS処理 -->
+  <script>
+    // --- State Management ---
+    let tasks = [];
+    let activeTaskId = null;
+    let timerInterval = null;
+
+    // --- DOM Elements ---
+    const taskForm = document.getElementById('add-task-form');
+    const taskInput = document.getElementById('task-input');
+    const taskList = document.getElementById('task-list');
+    const emptyState = document.getElementById('empty-state');
+    const totalTimeDisplay = document.getElementById('total-time-display');
+    const completedCountDisplay = document.getElementById('completed-count-display');
+    const taskCountLabel = document.getElementById('task-count-label');
+    const reportTextarea = document.getElementById('report-textarea');
+    const copyReportBtn = document.getElementById('copy-report-btn');
+    const resetDayBtn = document.getElementById('reset-day-btn');
+    const currentDateDisplay = document.getElementById('current-date-display');
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+
+    // --- Initialization ---
+    window.onload = function() {
+      // アイコン初期化
+      lucide.createIcons();
+      
+      // 日付表示
+      const now = new Date();
+      const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
+      currentDateDisplay.textContent = now.toLocaleDateString('ja-JP', options);
+
+      // LocalStorageから読み込み
+      loadTasks();
+      
+      // タイマー再開チェック（リロード前に動いていた場合）
+      const runningTask = tasks.find(t => t.isRunning);
+      if (runningTask) {
+        startTimer(runningTask.id);
+      } else {
+        render();
+      }
+    };
+
+    // --- Storage ---
+    function saveTasks() {
+      localStorage.setItem('focuslog_tasks', JSON.stringify(tasks));
+    }
+
+    function loadTasks() {
+      const saved = localStorage.getItem('focuslog_tasks');
+      if (saved) {
+        try {
+          tasks = JSON.parse(saved);
+        } catch (e) {
+          tasks = [];
+        }
+      }
+    }
+
+    // --- Time Format Helpers ---
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    function formatTimeMilliseconds(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const milli = Math.floor((ms % 1000) / 100); // 1/10秒表示
+
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}.<span class="text-xs text-note-green font-semibold">${milli}</span>`;
+    }
+
+    function formatTimeJapanese(ms) {
+      const totalMinutes = Math.round(ms / (1000 * 60));
+      if (totalMinutes === 0) return '1分未満';
+
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      if (hours > 0 && minutes > 0) {
+        return `${hours}時間${minutes}分`;
+      } else if (hours > 0) {
+        return `${hours}時間`;
+      } else {
+        return `${minutes}分`;
+      }
+    }
+
+    // --- Timer Controls ---
+    function startTimer(id) {
+      // 既に動いている他のタイマーを停止
+      tasks.forEach(t => {
+        if (t.id !== id && t.isRunning) {
+          t.isRunning = false;
+        }
+      });
+
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      task.isRunning = true;
+      activeTaskId = id;
+      
+      let lastTime = Date.now();
+
+      if (timerInterval) clearInterval(timerInterval);
+
+      timerInterval = setInterval(() => {
+        const now = Date.now();
+        const delta = now - lastTime;
+        lastTime = now;
+
+        task.elapsedTime += delta;
+        
+        // 画面の更新（タイマー表示部分のみ高速描画）
+        updateTimerDOM(id);
+        updateTotalTimeDOM();
+        generateReportText();
+        saveTasks();
+      }, 100);
+
+      render();
+    }
+
+    function pauseTimer(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.isRunning = false;
+      }
+      if (activeTaskId === id) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        activeTaskId = null;
+      }
+      saveTasks();
+      render();
+    }
+
+    function toggleComplete(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      if (task.isRunning) {
+        pauseTimer(id);
+      }
+
+      task.isCompleted = !task.isCompleted;
+      saveTasks();
+      render();
+    }
+
+    function deleteTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task && task.isRunning) {
+        pauseTimer(id);
+      }
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      render();
+    }
+
+    // --- DOM Update Functions ---
+    function updateTimerDOM(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      const timerEl = document.getElementById(`timer-display-${id}`);
+      if (timerEl) {
+        timerEl.innerHTML = formatTimeMilliseconds(task.elapsedTime);
+      }
+    }
+
+    function updateTotalTimeDOM() {
+      const totalMs = tasks.reduce((acc, t) => acc + t.elapsedTime, 0);
+      totalTimeDisplay.textContent = formatTime(totalMs);
+    }
+
+    // --- Main Render ---
+    function render() {
+      taskList.innerHTML = '';
+
+      if (tasks.length === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+      }
+
+      taskCountLabel.textContent = `${tasks.length}件`;
+
+      const completedTasks = tasks.filter(t => t.isCompleted).length;
+      completedCountDisplay.textContent = `${completedTasks} / ${tasks.length}`;
+
+      updateTotalTimeDOM();
+
+      tasks.forEach(task => {
+        const card = document.createElement('div');
+        const isActive = task.isRunning;
+        const isDone = task.isCompleted;
+
+        card.className = `bg-white rounded-2xl p-4 border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          isActive 
+            ? 'border-note-green ring-2 ring-note-green/20 shadow-md' 
+            : isDone 
+              ? 'border-note-border opacity-60 bg-gray-50/50' 
+              : 'border-note-border hover:border-gray-300 shadow-sm'
+        }`;
+
+        card.innerHTML = `
+          <!-- タスク名 & ステータス -->
+          <div class="flex items-center space-x-3 flex-1 min-w-0">
+            <button 
+              onclick="toggleComplete('${task.id}')"
+              class="w-6 h-6 rounded-full border ${isDone ? 'bg-note-green border-note-green text-white' : 'border-gray-300 text-transparent hover:border-note-green'} flex items-center justify-center transition-colors shrink-0"
+              title="${isDone ? '未完了に戻す' : '完了にする'}"
+            >
+              <i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>
+            </button>
+            
+            <span class="text-sm font-medium ${isDone ? 'line-through text-note-subtext' : 'text-note-text'} truncate">
+              ${escapeHtml(task.title)}
+            </span>
+          </div>
+
+          <!-- タイマー & 操作ボタン -->
+          <div class="flex items-center justify-between sm:justify-end space-x-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+            <!-- 時間表示 -->
+            <div id="timer-display-${task.id}" class="font-mono text-base font-semibold ${isActive ? 'text-note-green' : 'text-note-subtext'} min-w-[90px] text-right">
+              ${isActive ? formatTimeMilliseconds(task.elapsedTime) : formatTime(task.elapsedTime)}
+            </div>
+
+            <!-- 操作ボタン -->
+            <div class="flex items-center space-x-1">
+              ${!isDone ? `
+                ${isActive ? `
+                  <button 
+                    onclick="pauseTimer('${task.id}')"
+                    class="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                    title="一時停止"
+                  >
+                    <i data-lucide="pause" class="w-4 h-4"></i>
+                  </button>
+                ` : `
+                  <button 
+                    onclick="startTimer('${task.id}')"
+                    class="p-2 rounded-xl bg-note-green-light text-note-green hover:bg-note-green hover:text-white transition-colors"
+                    title="計測開始"
+                  >
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                  </button>
+                `}
+              ` : ''}
+
+              <button 
+                onclick="deleteTask('${task.id}')"
+                class="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                title="削除"
+              >
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        `;
+
+        taskList.appendChild(card);
+      });
+
+      // アイコン再レンダリング
+      lucide.createIcons();
+
+      // 日報テキスト更新
+      generateReportText();
+    }
+
+    // HTMLエスケープ処理
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, function(m) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+      });
+    }
+
+    // --- Report Text Generator ---
+    function generateReportText() {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+      
+      const totalMs = tasks.reduce((acc, t) => acc + t.elapsedTime, 0);
+      const formattedTotal = formatTimeJapanese(totalMs);
+
+      let text = `【本日の作業記録】 (${dateStr})\n`;
+
+      if (tasks.length === 0) {
+        text += `\n（本日記録されたタスクはありません）\n`;
+      } else {
+        tasks.forEach(task => {
+          const status = task.isCompleted ? '✓ ' : '・';
+          const timeStr = formatTimeJapanese(task.elapsedTime);
+          text += `${status}${task.title}: ${timeStr}\n`;
+        });
+      }
+
+      text += `\n合計時間: ${formattedTotal}\n#今日の積み上げ #FocusLog`;
+
+      reportTextarea.value = text;
+    }
+
+    // --- Event Handlers ---
+    // タスク追加
+    taskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const title = taskInput.value.trim();
+      if (!title) return;
+
+      const newTask = {
+        id: Date.now().toString(),
+        title: title,
+        elapsedTime: 0,
+        isRunning: false,
+        isCompleted: false,
+        createdAt: new Date().toISOString()
+      };
+
+      tasks.push(newTask);
+      taskInput.value = '';
+      saveTasks();
+      render();
+    });
+
+    // コピー機能
+    copyReportBtn.addEventListener('click', () => {
+      const text = reportTextarea.value;
+      if (!text) return;
+
+      // execCommand を利用して確実にクリップボードへ書き込み
+      const tempTextarea = document.createElement('textarea');
+      tempTextarea.value = text;
+      document.body.appendChild(tempTextarea);
+      tempTextarea.select();
+      
+      try {
+        document.execCommand('copy');
+        showToast('日報テキストをコピーしました！');
+      } catch (err) {
+        showToast('コピーに失敗しました');
+      } finally {
+        document.body.removeChild(tempTextarea);
+      }
+    });
+
+    // トースト通知
+    function showToast(message) {
+      toastMessage.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // 日を改める（リセット）
+    resetDayBtn.addEventListener('click', () => {
+      if (tasks.length === 0) return;
+
+      const confirmReset = window.confirm('本日のタスクと計測記録をリセットして、新しい日を開始しますか？');
+      if (confirmReset) {
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        tasks = [];
+        activeTaskId = null;
+        saveTasks();
+        render();
+        showToast('新しい日を開始しました');
+      }
+    });
+  </script>
+</body>
+</html>
